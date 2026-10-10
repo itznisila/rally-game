@@ -6,44 +6,97 @@ WIDTH, HEIGHT = 1000, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 32)
+big_font = pygame.font.SysFont(None, 72)
 
 GRASS = (60, 120, 60)
 ROAD = (90, 90, 90)
+SAND = (194, 170, 110)
+WHITE = (255, 255, 255)
+ROCK = (125, 125, 130)
+ROCK_DARK = (70, 70, 75)
+
 CX, CY = WIDTH // 2, HEIGHT // 2
+
+def point_on_ellipse(deg, rx, ry):
+    r = math.radians(deg)
+    return (CX + rx * math.cos(r), CY + ry * math.sin(r))
+
 track = pygame.Surface((WIDTH, HEIGHT))
 track.fill(GRASS)
+
+outer_sand = [(90, 90, 65), (910, 100, 60), (80, 620, 60), (915, 610, 65)]
+for sx, sy, sr in outer_sand:
+    pygame.draw.circle(track, SAND, (sx, sy), sr)
+
 pygame.draw.ellipse(track, ROAD, (CX - 450, CY - 300, 900, 600))
 pygame.draw.ellipse(track, GRASS, (CX - 250, CY - 150, 500, 300))
-pygame.draw.line(track, (255, 255, 255), (CX, CY - 300), (CX, CY - 150), 4)
 
-def on_grass(x, y):
-    if 0 <= x < WIDTH and 0 <= y < HEIGHT:
-        return track.get_at((int(x), int(y)))[:3] == GRASS
-    return True
+inner_sand = [(CX - 60, CY - 20, 55), (CX + 90, CY + 40, 40)]
+for sx, sy, sr in inner_sand:
+    pygame.draw.circle(track, SAND, (sx, sy), sr)
 
-MID_RX, MID_RY = 350, 225
-def point_on_track(deg):
-    r = math.radians(deg)
-    return (CX + MID_RX * math.cos(r), CY + MID_RY * math.sin(r))
+for deg in range(0, 360, 8):
+    p1 = point_on_ellipse(deg, 350, 225)
+    p2 = point_on_ellipse(deg + 4, 350, 225)
+    pygame.draw.line(track, WHITE, p1, p2, 4)
 
-checkpoints = [point_on_track(0), point_on_track(90),
-               point_on_track(180), point_on_track(270)]
+pygame.draw.line(track, WHITE, (CX, CY - 300), (CX, CY - 150), 4)
 
-x, y = CX, CY - 225
-angle = 0
-speed = 0
+rocks = [
+    (50, 50, 16), (160, 35, 12), (935, 55, 18), (840, 40, 12),
+    (45, 650, 15), (150, 668, 12), (955, 645, 17), (850, 662, 13),
+    (CX - 170, CY - 30, 15), (CX + 120, CY + 70, 14),
+    (CX - 20, CY + 90, 12), (CX + 170, CY - 40, 13),
+]
+
+for rx, ry, rr in rocks:
+    pygame.draw.circle(track, ROCK_DARK, (rx, ry), rr + 2)
+    pygame.draw.circle(track, ROCK, (rx, ry), rr)
+    pygame.draw.circle(track, (170, 170, 175), (rx - rr // 3, ry - rr // 3), rr // 3)  # shine
+
+def surface_friction(x, y):
+    if not (0 <= x < WIDTH and 0 <= y < HEIGHT):
+        return 3.0
+    colour = track.get_at((int(x), int(y)))[:3]
+    if colour == GRASS:
+        return 3.0
+    if colour == SAND:
+        return 5.0
+    return 1.0
+
+checkpoints = [point_on_ellipse(d, 350, 225) for d in (0, 90, 180, 270)]
+
+
+START_X, START_Y = CX, CY - 262
+x, y, angle, speed = START_X, START_Y, 0, 0
 ACCEL = 300
 BRAKE = 500
 STEER = 140
+CAR_RADIUS = 14
+
+def make_car(braking):
+    img = pygame.Surface((44, 22), pygame.SRCALPHA)
+    pygame.draw.rect(img, (30, 90, 200), (0, 0, 44, 22), border_radius=5)
+    pygame.draw.rect(img, (30, 30, 30), (24, 3, 10, 16))
+    # headlights (front)
+    pygame.draw.rect(img, (255, 255, 160), (40, 4, 3, 4))
+    pygame.draw.rect(img, (255, 255, 160), (40, 14, 3, 4))
+    # brake lights (back): dark red normally, bright red when braking
+    light = (255, 40, 40) if braking else (120, 0, 0)
+    pygame.draw.rect(img, light, (1, 4, 3, 4))
+    pygame.draw.rect(img, light, (1, 14, 3, 4))
+    return img
+
+
+car_normal = make_car(False)
+car_braking = make_car(True)
+
 
 next_cp = 0
 laps = 0
 lap_time = 0.0
 best_lap = None
-
-car_img = pygame.Surface((44, 22), pygame.SRCALPHA)
-pygame.draw.rect(car_img, (220, 30, 30), (0, 0, 44, 22), border_radius=5)
-pygame.draw.rect(car_img, (30, 30, 30), (26, 3, 10, 16))
+crash_timer = 0.0
 
 running = True
 while running:
@@ -62,9 +115,7 @@ while running:
     if keys[pygame.K_DOWN]:
         speed -= BRAKE * dt
     speed = max(speed, -100)
-
-    friction = 3.0 if on_grass(x, y) else 1.0
-    speed -= speed * friction * dt
+    speed -= speed * surface_friction(x, y) * dt
 
     if abs(speed) > 10:
         direction = 1 if speed > 0 else -1
@@ -77,6 +128,15 @@ while running:
     y += math.sin(math.radians(angle)) * speed * dt
     x = max(0, min(WIDTH, x))
     y = max(0, min(HEIGHT, y))
+
+    for rx, ry, rr in rocks:
+        if math.hypot(x - rx, y - ry) < rr + CAR_RADIUS:
+            x, y, angle, speed = START_X, START_Y, 0, 0
+            next_cp = 0
+            lap_time = 0.0
+            crash_timer = 1.0
+            break
+    crash_timer = max(0.0, crash_timer - dt)
 
     lap_time += dt
     cx, cy = checkpoints[next_cp]
@@ -92,6 +152,7 @@ while running:
 
     # --- draw ---
     screen.blit(track, (0, 0))
+    car_img = car_braking if keys[pygame.K_DOWN] else car_normal
     rotated = pygame.transform.rotate(car_img, -angle)
     screen.blit(rotated, rotated.get_rect(center=(x, y)))
 
@@ -102,7 +163,11 @@ while running:
         f"Speed: {abs(int(speed))}",
     ]
     for i, text in enumerate(hud):
-        screen.blit(font.render(text, True, (255, 255, 255)), (15, 12 + i * 28))
+        screen.blit(font.render(text, True, WHITE), (15, 12 + i * 28))
+
+    if crash_timer > 0:
+        msg = big_font.render("CRASH! Restarting...", True, (255, 80, 80))
+        screen.blit(msg, msg.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
 
     pygame.display.flip()
 
