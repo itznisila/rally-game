@@ -19,3 +19,11 @@ def on_grass(x, y):
     if 0 <= x < WIDTH and 0 <= y < HEIGHT:
         return track.get_at((int(x), int(y)))[:3] == GRASS
     return True
+
+MID_RX, MID_RY = 350, 225
+def point_on_track(deg):
+    r = math.radians(deg)
+    return (CX + MID_RX * math.cos(r), CY + MID_RY * math.sin(r))
+
+checkpoints = [point_on_track(0), point_on_track(90),
+               point_on_track(180), point_on_track(270)]
