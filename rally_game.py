@@ -34,3 +34,8 @@ speed = 0
 ACCEL = 300
 BRAKE = 500
 STEER = 140
+
+next_cp = 0
+laps = 0
+lap_time = 0.0
+best_lap = None
