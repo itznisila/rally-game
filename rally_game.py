@@ -27,3 +27,10 @@ def point_on_track(deg):
 
 checkpoints = [point_on_track(0), point_on_track(90),
                point_on_track(180), point_on_track(270)]
+
+x, y = CX, CY - 225
+angle = 0
+speed = 0
+ACCEL = 300
+BRAKE = 500
+STEER = 140
