@@ -76,3 +76,33 @@ while running:
     y += math.sin(math.radians(angle)) * speed * dt
     x = max(0, min(WIDTH, x))
     y = max(0, min(HEIGHT, y))
+
+    lap_time += dt
+    cx, cy = checkpoints[next_cp]
+    if math.hypot(x - cx, y - cy) < 90:
+        if next_cp == 3:
+            laps += 1
+            if best_lap is None or lap_time < best_lap:
+                best_lap = lap_time
+            lap_time = 0.0
+            next_cp = 0
+        else:
+            next_cp += 1
+
+    # --- draw ---
+    screen.blit(track, (0, 0))
+    rotated = pygame.transform.rotate(car_img, -angle)
+    screen.blit(rotated, rotated.get_rect(center=(x, y)))
+
+    hud = [
+        f"Lap: {laps}",
+        f"Time: {lap_time:5.1f}s",
+        f"Best: {best_lap:5.1f}s" if best_lap else "Best: --",
+        f"Speed: {abs(int(speed))}",
+    ]
+    for i, text in enumerate(hud):
+        screen.blit(font.render(text, True, (255, 255, 255)), (15, 12 + i * 28))
+
+    pygame.display.flip()
+
+pygame.quit()
