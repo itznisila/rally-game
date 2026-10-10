@@ -14,6 +14,7 @@ track = pygame.Surface((WIDTH, HEIGHT))
 track.fill(GRASS)
 pygame.draw.ellipse(track, ROAD, (CX - 450, CY - 300, 900, 600))
 pygame.draw.ellipse(track, GRASS, (CX - 250, CY - 150, 500, 300))
+pygame.draw.line(track, (255, 255, 255), (CX, CY - 300), (CX, CY - 150), 4)
 
 def on_grass(x, y):
     if 0 <= x < WIDTH and 0 <= y < HEIGHT:
