@@ -43,3 +43,15 @@ best_lap = None
 car_img = pygame.Surface((44, 22), pygame.SRCALPHA)
 pygame.draw.rect(car_img, (220, 30, 30), (0, 0, 44, 22), border_radius=5)
 pygame.draw.rect(car_img, (30, 30, 30), (26, 3, 10, 16))
+
+running = True
+while running:
+    dt = clock.tick(60) / 1000
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            running = False
+
+    keys = pygame.key.get_pressed()
