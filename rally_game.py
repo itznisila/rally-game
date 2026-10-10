@@ -64,3 +64,10 @@ while running:
 
     friction = 3.0 if on_grass(x, y) else 1.0
     speed -= speed * friction * dt
+
+    if abs(speed) > 10:
+        direction = 1 if speed > 0 else -1
+        if keys[pygame.K_LEFT]:
+            angle -= STEER * dt * direction
+        if keys[pygame.K_RIGHT]:
+            angle += STEER * dt * direction
