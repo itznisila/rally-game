@@ -39,3 +39,7 @@ next_cp = 0
 laps = 0
 lap_time = 0.0
 best_lap = None
+
+car_img = pygame.Surface((44, 22), pygame.SRCALPHA)
+pygame.draw.rect(car_img, (220, 30, 30), (0, 0, 44, 22), border_radius=5)
+pygame.draw.rect(car_img, (30, 30, 30), (26, 3, 10, 16))
