@@ -4,6 +4,7 @@ import pygame
 pygame.init()
 WIDTH, HEIGHT = 1000, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Rally Game")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 32)
 big_font = pygame.font.SysFont(None, 72)
@@ -20,6 +21,20 @@ CX, CY = WIDTH // 2, HEIGHT // 2
 def point_on_ellipse(deg, rx, ry):
     r = math.radians(deg)
     return (CX + rx * math.cos(r), CY + ry * math.sin(r))
+
+def make_car(braking, body=(30, 90, 200)):
+    """Draw a car picture. Front = right side, back = left side."""
+    img = pygame.Surface((44, 22), pygame.SRCALPHA)
+    pygame.draw.rect(img, body, (0, 0, 44, 22), border_radius=5)            # body
+    pygame.draw.rect(img, (30, 30, 30), (24, 3, 10, 16))                    # windscreen
+    # headlights (front)
+    pygame.draw.rect(img, (255, 255, 160), (40, 4, 3, 4))
+    pygame.draw.rect(img, (255, 255, 160), (40, 14, 3, 4))
+    # brake lights (back): dark red normally, bright red when braking
+    light = (255, 40, 40) if braking else (120, 0, 0)
+    pygame.draw.rect(img, light, (1, 4, 3, 4))
+    pygame.draw.rect(img, light, (1, 14, 3, 4))
+    return img
 
 track = pygame.Surface((WIDTH, HEIGHT))
 track.fill(GRASS)
@@ -54,6 +69,39 @@ for rx, ry, rr in rocks:
     pygame.draw.circle(track, ROCK, (rx, ry), rr)
     pygame.draw.circle(track, (170, 170, 175), (rx - rr // 3, ry - rr // 3), rr // 3)  # shine
 
+PARKED_RADIUS = 12
+parked_circles = []
+
+
+def add_parked_car(deg, body):
+    """Park a car just outside the road at this angle, pointing along the road."""
+    ex, ey = 480, 330  # a bit bigger than the road oval
+    px, py = point_on_ellipse(deg, ex, ey)
+    t = math.radians(deg)
+    heading = math.degrees(math.atan2(ey * math.cos(t), -ex * math.sin(t)))
+    img = pygame.transform.rotate(make_car(False, body), -heading)
+    track.blit(img, img.get_rect(center=(px, py)))  # paint it onto the track
+    for shift in (-10, 10):  # 2 circles = back and front of the car
+        circle_x = px + math.cos(math.radians(heading)) * shift
+        circle_y = py + math.sin(math.radians(heading)) * shift
+        parked_circles.append((circle_x, circle_y, PARKED_RADIUS))
+
+
+PARKED = [
+    (20, (240, 200, 40)),  # yellow
+    (75, (235, 235, 235)),  # white
+    (130, (240, 130, 30)),  # orange
+    (175, (90, 200, 230)),  # light blue
+    (240, (210, 40, 40)),  # red
+    (300, (150, 60, 180)),  # purple
+    (340, (240, 120, 170)),  # pink
+]
+for deg, colour in PARKED:
+    add_parked_car(deg, colour)
+
+obstacles = rocks + parked_circles
+
+
 def surface_friction(x, y):
     if not (0 <= x < WIDTH and 0 <= y < HEIGHT):
         return 3.0
@@ -74,23 +122,8 @@ BRAKE = 500
 STEER = 140
 CAR_RADIUS = 14
 
-def make_car(braking):
-    img = pygame.Surface((44, 22), pygame.SRCALPHA)
-    pygame.draw.rect(img, (30, 90, 200), (0, 0, 44, 22), border_radius=5)
-    pygame.draw.rect(img, (30, 30, 30), (24, 3, 10, 16))
-    # headlights (front)
-    pygame.draw.rect(img, (255, 255, 160), (40, 4, 3, 4))
-    pygame.draw.rect(img, (255, 255, 160), (40, 14, 3, 4))
-    # brake lights (back): dark red normally, bright red when braking
-    light = (255, 40, 40) if braking else (120, 0, 0)
-    pygame.draw.rect(img, light, (1, 4, 3, 4))
-    pygame.draw.rect(img, light, (1, 14, 3, 4))
-    return img
-
-
 car_normal = make_car(False)
 car_braking = make_car(True)
-
 
 next_cp = 0
 laps = 0
@@ -129,8 +162,8 @@ while running:
     x = max(0, min(WIDTH, x))
     y = max(0, min(HEIGHT, y))
 
-    for rx, ry, rr in rocks:
-        if math.hypot(x - rx, y - ry) < rr + CAR_RADIUS:
+    for ox, oy, orad in obstacles:
+        if math.hypot(x - ox, y - oy) < orad + CAR_RADIUS:
             x, y, angle, speed = START_X, START_Y, 0, 0
             next_cp = 0
             lap_time = 0.0
