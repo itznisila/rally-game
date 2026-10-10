@@ -71,3 +71,8 @@ while running:
             angle -= STEER * dt * direction
         if keys[pygame.K_RIGHT]:
             angle += STEER * dt * direction
+
+    x += math.cos(math.radians(angle)) * speed * dt
+    y += math.sin(math.radians(angle)) * speed * dt
+    x = max(0, min(WIDTH, x))
+    y = max(0, min(HEIGHT, y))
