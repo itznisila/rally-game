@@ -55,3 +55,12 @@ while running:
             running = False
 
     keys = pygame.key.get_pressed()
+
+    if keys[pygame.K_UP]:
+        speed += ACCEL * dt
+    if keys[pygame.K_DOWN]:
+        speed -= BRAKE * dt
+    speed = max(speed, -100)
+
+    friction = 3.0 if on_grass(x, y) else 1.0
+    speed -= speed * friction * dt
