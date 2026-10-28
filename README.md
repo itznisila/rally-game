@@ -71,6 +71,11 @@ rally-game/
 - Light cone from the headlights
 - Time penalty for crossing the white lane line
 
+## Roadmap
+- [ ] Save best lap time to a file
+- [ ] Sound effects
+- [ ] Second car / AI opponent
+
 ## Author
 
 **Nisila Dinod**
