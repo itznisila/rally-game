@@ -12,6 +12,7 @@ A 2D top-down rally car game built with **Python** and **Pygame**. Drive around 
 - **Obstacles**: rocks and parked cars. Hit one and you restart from the start line
 - **Checkpoints and laps**: checkpoints must be passed in order, so there are no shortcuts
 - **HUD**: lap count, current lap time, best lap and speed
+- **Pause**: press P to freeze the game and press P again to carry on
 - **Car lights**: headlights at the front, and brake lights that glow brighter when you brake
 
 ## How to run
@@ -38,6 +39,7 @@ A 2D top-down rally car game built with **Python** and **Pygame**. Drive around 
 | ↑ | Accelerate |
 | ↓ | Brake / reverse |
 | ← → | Steer |
+| P | Pause / resume |
 | ESC | Quit |
 
 ## How it works
@@ -48,7 +50,7 @@ A 2D top-down rally car game built with **Python** and **Pygame**. Drive around 
 | Surfaces | The game reads the colour of the pixel under the car to decide how much to slow it down |
 | Obstacles | Rocks and parked cars are stored as circles, and touching one restarts the car |
 | Checkpoints | Points around the track measured by distance from the car |
-| Game loop | Runs 60 times per second: read keys, update speed, move, check crashes, check laps, draw |
+| Game loop | Runs 60 times per second: read keys, update speed, move, check crashes, check laps, draw (skipped while paused) |
 
 ## Project structure
 
