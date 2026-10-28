@@ -80,3 +80,4 @@ rally-game/
 
 **Nisila Dinod**
 GitHub: [@itznisila](https://github.com/itznisila)
+Thanks for playing!
