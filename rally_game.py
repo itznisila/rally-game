@@ -2,27 +2,69 @@ import math
 import pygame
 
 pygame.init()
+
+# ----- Window and timing -----
 WIDTH, HEIGHT = 1000, 700
+FPS = 60
+CX, CY = WIDTH // 2, HEIGHT // 2
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Rally Game")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont(None, 32)
 big_font = pygame.font.SysFont(None, 72)
 
+# ----- Colours -----
 GRASS = (60, 120, 60)
 ROAD = (90, 90, 90)
 SAND = (194, 170, 110)
 WHITE = (255, 255, 255)
 ROCK = (125, 125, 130)
 ROCK_DARK = (70, 70, 75)
+ROCK_SHINE = (170, 170, 175)
+CAR_BLUE = (30, 90, 200)
+CRASH_RED = (255, 80, 80)
 
-CX, CY = WIDTH // 2, HEIGHT // 2
+# ----- Track layout -----
+ROAD_OUTER_SIZE = (900, 600)       # outer edge of the road oval
+ROAD_INNER_SIZE = (500, 300)       # grass infield inside the road
+LANE_RX, LANE_RY = 350, 225        # middle of the road (lane line + checkpoints)
+LANE_LINE_WIDTH = 4
+PARKED_RX, PARKED_RY = 480, 330    # parked cars sit just outside the road
+PARKED_RADIUS = 12
+PARKED_SHIFT = 10                  # distance of the 2 circles from a car's centre
+CHECKPOINT_ANGLES = (0, 90, 180, 270)
+
+# ----- Surface friction (higher = slows the car more) -----
+FRICTION_ROAD = 1.0
+FRICTION_GRASS = 3.0
+FRICTION_SAND = 5.0
+
+# ----- Car physics -----
+START_X, START_Y = CX, CY - 262
+ACCEL = 300
+BRAKE = 500
+STEER = 140
+MAX_REVERSE_SPEED = 100
+MIN_STEER_SPEED = 10               # the car must be moving to steer
+CAR_RADIUS = 14
+
+# ----- Gameplay -----
+CHECKPOINT_RADIUS = 90
+CRASH_MESSAGE_TIME = 1.0           # seconds the crash message stays on screen
+
+# ----- HUD and pause screen -----
+HUD_X, HUD_Y = 15, 12
+HUD_LINE_HEIGHT = 28
+PAUSE_HINT_OFFSET = 55
+
 
 def point_on_ellipse(deg, rx, ry):
     r = math.radians(deg)
     return (CX + rx * math.cos(r), CY + ry * math.sin(r))
 
-def make_car(braking, body=(30, 90, 200)):
+
+def make_car(braking, body=CAR_BLUE):
     """Draw a car picture. Front = right side, back = left side."""
     img = pygame.Surface((44, 22), pygame.SRCALPHA)
     pygame.draw.rect(img, body, (0, 0, 44, 22), border_radius=5)            # body
@@ -36,6 +78,7 @@ def make_car(braking, body=(30, 90, 200)):
     pygame.draw.rect(img, light, (1, 14, 3, 4))
     return img
 
+
 track = pygame.Surface((WIDTH, HEIGHT))
 track.fill(GRASS)
 
@@ -43,19 +86,23 @@ outer_sand = [(90, 90, 65), (910, 100, 60), (80, 620, 60), (915, 610, 65)]
 for sx, sy, sr in outer_sand:
     pygame.draw.circle(track, SAND, (sx, sy), sr)
 
-pygame.draw.ellipse(track, ROAD, (CX - 450, CY - 300, 900, 600))
-pygame.draw.ellipse(track, GRASS, (CX - 250, CY - 150, 500, 300))
+road_w, road_h = ROAD_OUTER_SIZE
+infield_w, infield_h = ROAD_INNER_SIZE
+pygame.draw.ellipse(track, ROAD, (CX - road_w // 2, CY - road_h // 2, road_w, road_h))
+pygame.draw.ellipse(track, GRASS, (CX - infield_w // 2, CY - infield_h // 2, infield_w, infield_h))
 
 inner_sand = [(CX - 60, CY - 20, 55), (CX + 90, CY + 40, 40)]
 for sx, sy, sr in inner_sand:
     pygame.draw.circle(track, SAND, (sx, sy), sr)
 
+# dashed lane line around the middle of the road
 for deg in range(0, 360, 8):
-    p1 = point_on_ellipse(deg, 350, 225)
-    p2 = point_on_ellipse(deg + 4, 350, 225)
-    pygame.draw.line(track, WHITE, p1, p2, 4)
+    p1 = point_on_ellipse(deg, LANE_RX, LANE_RY)
+    p2 = point_on_ellipse(deg + 4, LANE_RX, LANE_RY)
+    pygame.draw.line(track, WHITE, p1, p2, LANE_LINE_WIDTH)
 
-pygame.draw.line(track, WHITE, (CX, CY - 300), (CX, CY - 150), 4)
+# start / finish line
+pygame.draw.line(track, WHITE, (CX, CY - road_h // 2), (CX, CY - infield_h // 2), LANE_LINE_WIDTH)
 
 rocks = [
     (50, 50, 16), (160, 35, 12), (935, 55, 18), (840, 40, 12),
@@ -67,21 +114,19 @@ rocks = [
 for rx, ry, rr in rocks:
     pygame.draw.circle(track, ROCK_DARK, (rx, ry), rr + 2)
     pygame.draw.circle(track, ROCK, (rx, ry), rr)
-    pygame.draw.circle(track, (170, 170, 175), (rx - rr // 3, ry - rr // 3), rr // 3)  # shine
+    pygame.draw.circle(track, ROCK_SHINE, (rx - rr // 3, ry - rr // 3), rr // 3)  # shine
 
-PARKED_RADIUS = 12
 parked_circles = []
 
 
 def add_parked_car(deg, body):
     """Park a car just outside the road at this angle, pointing along the road."""
-    ex, ey = 480, 330  # a bit bigger than the road oval
-    px, py = point_on_ellipse(deg, ex, ey)
+    px, py = point_on_ellipse(deg, PARKED_RX, PARKED_RY)
     t = math.radians(deg)
-    heading = math.degrees(math.atan2(ey * math.cos(t), -ex * math.sin(t)))
+    heading = math.degrees(math.atan2(PARKED_RY * math.cos(t), -PARKED_RX * math.sin(t)))
     img = pygame.transform.rotate(make_car(False, body), -heading)
     track.blit(img, img.get_rect(center=(px, py)))  # paint it onto the track
-    for shift in (-10, 10):  # 2 circles = back and front of the car
+    for shift in (-PARKED_SHIFT, PARKED_SHIFT):  # 2 circles = back and front of the car
         circle_x = px + math.cos(math.radians(heading)) * shift
         circle_y = py + math.sin(math.radians(heading)) * shift
         parked_circles.append((circle_x, circle_y, PARKED_RADIUS))
@@ -104,23 +149,19 @@ obstacles = rocks + parked_circles
 
 def surface_friction(x, y):
     if not (0 <= x < WIDTH and 0 <= y < HEIGHT):
-        return 3.0
+        return FRICTION_GRASS
     colour = track.get_at((int(x), int(y)))[:3]
     if colour == GRASS:
-        return 3.0
+        return FRICTION_GRASS
     if colour == SAND:
-        return 5.0
-    return 1.0
-
-checkpoints = [point_on_ellipse(d, 350, 225) for d in (0, 90, 180, 270)]
+        return FRICTION_SAND
+    return FRICTION_ROAD
 
 
-START_X, START_Y = CX, CY - 262
+checkpoints = [point_on_ellipse(d, LANE_RX, LANE_RY) for d in CHECKPOINT_ANGLES]
+LAST_CHECKPOINT = len(checkpoints) - 1
+
 x, y, angle, speed = START_X, START_Y, 0, 0
-ACCEL = 300
-BRAKE = 500
-STEER = 140
-CAR_RADIUS = 14
 
 car_normal = make_car(False)
 car_braking = make_car(True)
@@ -134,7 +175,7 @@ paused = False
 
 running = True
 while running:
-    dt = clock.tick(60) / 1000
+    dt = clock.tick(FPS) / 1000
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -148,9 +189,9 @@ while running:
         # Keep the last frame on screen and show a PAUSED message.
         # Nothing moves and the lap timer stops while paused.
         msg = big_font.render("PAUSED", True, WHITE)
-        screen.blit(msg, msg.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+        screen.blit(msg, msg.get_rect(center=(CX, CY)))
         hint = font.render("Press P to resume", True, WHITE)
-        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 55)))
+        screen.blit(hint, hint.get_rect(center=(CX, CY + PAUSE_HINT_OFFSET)))
         pygame.display.flip()
         continue
 
@@ -160,10 +201,10 @@ while running:
         speed += ACCEL * dt
     if keys[pygame.K_DOWN]:
         speed -= BRAKE * dt
-    speed = max(speed, -100)
+    speed = max(speed, -MAX_REVERSE_SPEED)
     speed -= speed * surface_friction(x, y) * dt
 
-    if abs(speed) > 10:
+    if abs(speed) > MIN_STEER_SPEED:
         direction = 1 if speed > 0 else -1
         if keys[pygame.K_LEFT]:
             angle -= STEER * dt * direction
@@ -180,14 +221,14 @@ while running:
             x, y, angle, speed = START_X, START_Y, 0, 0
             next_cp = 0
             lap_time = 0.0
-            crash_timer = 1.0
+            crash_timer = CRASH_MESSAGE_TIME
             break
     crash_timer = max(0.0, crash_timer - dt)
 
     lap_time += dt
     cx, cy = checkpoints[next_cp]
-    if math.hypot(x - cx, y - cy) < 90:
-        if next_cp == 3:
+    if math.hypot(x - cx, y - cy) < CHECKPOINT_RADIUS:
+        if next_cp == LAST_CHECKPOINT:
             laps += 1
             if best_lap is None or lap_time < best_lap:
                 best_lap = lap_time
@@ -209,11 +250,11 @@ while running:
         f"Speed: {abs(int(speed))}",
     ]
     for i, text in enumerate(hud):
-        screen.blit(font.render(text, True, WHITE), (15, 12 + i * 28))
+        screen.blit(font.render(text, True, WHITE), (HUD_X, HUD_Y + i * HUD_LINE_HEIGHT))
 
     if crash_timer > 0:
-        msg = big_font.render("CRASH! Restarting...", True, (255, 80, 80))
-        screen.blit(msg, msg.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+        msg = big_font.render("CRASH! Restarting...", True, CRASH_RED)
+        screen.blit(msg, msg.get_rect(center=(CX, CY)))
 
     pygame.display.flip()
 
