@@ -130,6 +130,7 @@ laps = 0
 lap_time = 0.0
 best_lap = None
 crash_timer = 0.0
+paused = False
 
 running = True
 while running:
@@ -140,6 +141,18 @@ while running:
             running = False
         if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
             running = False
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_p:
+            paused = not paused
+
+    if paused:
+        # Keep the last frame on screen and show a PAUSED message.
+        # Nothing moves and the lap timer stops while paused.
+        msg = big_font.render("PAUSED", True, WHITE)
+        screen.blit(msg, msg.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+        hint = font.render("Press P to resume", True, WHITE)
+        screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 55)))
+        pygame.display.flip()
+        continue
 
     keys = pygame.key.get_pressed()
 
